@@ -98,6 +98,13 @@ get_bebase() {
   return 0
 }
 
+# check if argument is a snapshot
+# is_snapshot: dataset/snapshot -> 0|1
+is_snapshot() {
+  echo "${1}" | grep -q "@" 2> /dev/null
+  return $?
+}
+
 # snapshot_exists: fullsnapname -> 0|1
 snapshot_exists() {
     zfs list -H -o name -t snapshot | grep "^$1$" > /dev/null
@@ -126,6 +133,70 @@ be_isclone() { # 1=DATASET
     return 2
   fi
 }
+
+# be_new: source target -> 0|1
+# Creates new boot environment
+be_new(){
+  local source=$( echo ${1} | cut -d '@' -f 1 )
+  local new_be=$2
+  local NAME_NEW=$( basename "${new_be}" )
+  local NAME_SANITY=$( echo "${NAME_NEW}" | tr -c -d 'a-zA-Z0-9-_.,' )
+  if [ "${NAME_NEW}" != "${NAME_SANITY}" ]
+  then
+    echo "ERROR: Can not create boot environment with '${NAME_NEW}' name"
+    echo
+    echo "Allowed characters for boot environment are:"
+    echo "  alphanumeric characters: 'a-z' 'A-Z' '0-9'"
+    echo "  hypen: '-'"
+    echo "  underscore: '_'"
+    echo "  dot: '.'"
+    echo "  comma: ','"
+    echo
+    echo "Name '${NAME_SANITY}' which uses only allowed characters can be used"
+    echo
+    return 1
+  fi
+  unset NAME_NEW
+  unset NAME_SANITY
+  if is_snapshot $1;then
+    local snapshot=$(echo ${1} | cut -d '@' -f 2)
+    zfs list -r -H -t filesystem -o name ${source} \
+      | while read FS;do
+          if ! zfs list -H -o name ${FS}@${snapshot} 1>/dev/null 2>/dev/null;then
+            echo "ERROR: Child snapshot '${FS}@${snapshot}' does not exist" >&2
+            return 1
+          fi
+        done
+  else
+    FMT=$( date "+%Y-%m-%d-%H:%M:%S" )
+    if ! zfs snapshot -r ${source}@${FMT} 1> /dev/null 2> /dev/null;then
+      echo "ERROR: Cannot create snapshot '${1}@${FMT}'" >&2
+      return 1
+    fi
+  fi
+  # clone properties of source boot environment
+  zfs list -H -o name -r ${source} \
+    | grep -v '@' \
+    | while read FS;do
+        local OPTS=""
+        while read NAME PROPERTY VALUE;do
+          if [ "${VALUE}" != "" ];then
+            local OPTS="-o ${PROPERTY}=\"${VALUE}\" ${OPTS}"
+          else
+            local OPTS=""
+            break
+          fi
+        done < <( zfs get -o name,property,value -s local,received -H all ${FS} | awk '!/[\t ]canmount[\t ]/' )
+        DATASET=$( echo ${FS} | awk '{print $1}' | sed -E s/"^${POOL}\/${BEDS}\/${source##*/}"/"${POOL}\/${BEDS}\/${new_be##*/}"/g )
+        if is_snapshot ${1};then
+          eval "zfs clone -o canmount=off ${OPTS} ${FS}@${1##*@} ${DATASET}"
+        else
+          eval "zfs clone -o canmount=off ${OPTS} ${FS}@${FMT} ${DATASET}"
+        fi
+      done
+  return 0
+}
+
 
 # check if system has a grub.cfg file and update it
 update_grub() {
@@ -338,18 +409,40 @@ cmd_list() {
 }
 
 cmd_create() {
-    local cc_clearsnap=0
-    local cc_activate=0
-    local cc_bename=${@:$#}
-    
-    while getopts "ae:" cc_pnam "$@"; do
-        #echo "$cc_pnam: $OPTARG"
-        case $cc_pnam in
-            a) cc_activate=1 ;;
-            e) cc_source=$OPTARG ;;
-            *) return usage ;;
-        esac
-    done
+  local cc_clearsnap=0
+  local cc_activate=0
+  local cc_bename=${@:$#}
+  
+  while getopts "ae:" cc_pnam "$@"; do
+    #echo "$cc_pnam: $OPTARG"
+    case $cc_pnam in
+      a) cc_activate=1 ;;
+      e) cc_source=$OPTARG ;;
+      *) return usage ;;
+    esac
+  done
+  if [ -n "$cc_source" ];then
+    if ! be_exists $(get_bebase)/$cc_source; then
+      echo "ERROR: Boot environment '$cc_source' does not exist"
+      return 1
+    fi
+    if be_exists $(get_bebase)/$cc_bename; then
+      echo "ERROR: Boot environment '$cc_bename' does exists"
+      return 1
+    fi
+    be_new $(get_bebase)/$cc_source $(get_bebase)/$cc_bename || return 1
+  else
+    if is_snapshot $cc_bename;then
+      if ! zfs snapshot -r $(get_bebase)/$cc_bename 1>/dev/null 2>/dev/null;then
+        echo "ERROR: Cannot create '$cc_bename' recursive snapshot"
+        return 1
+      fi
+    else
+      be_new ${ROOTFS} $(get_bebase)/$cc_bename || return 1
+    fi
+  fi
+  echo "Boot environment created"
+  if [ x$cc_activate = x1 ]; then cmd_activate $cc_bename; fi
 }
 
 cmd_destroy() {
@@ -370,7 +463,7 @@ cmd_activate() {
     return 1
   fi
   if ! zpool set bootfs=${be} ${POOL} 1> /dev/null 2> /dev/null;then
-    echo "ERROR: Failed to activate '${1}' boot environment" >2
+    echo "ERROR: Failed to activate '${1}' boot environment" >&2
     return 1
   fi
   # execute ZFS LIST only once
