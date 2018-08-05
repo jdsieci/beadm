@@ -40,10 +40,15 @@ then
 fi
 
 # update GRUB bootloader instead of FreeBSD's loader(8)
-: ${GRUB="NO"}
+: ${GRUB="YES"}
+# GRUB mkconfig command path
+: ${GRUBCMD="/usr/sbin/grub2-mkconfig"}
+# Grub config path
+: ${GRUB_CONFIG="/boot/efi/EFI/fedora/grub.cfg"}
 
 # use other prefix then the 'pool/ROOT/bename' default
 : ${BEDS="$( echo ${ROOTFS} | awk -F '/' '{print $2}' )"}
+
 
 usage() {
   local NAME=${0##*/}
@@ -69,12 +74,71 @@ get_command() {
 }
 
 list_zfs_roots() {
+  zfs list -H -o name -s creation | awk -F'/' \
+    -v BEROOT=$(get_bebase) \
+    'match($0,"^" BEROOT "/.+") {
+      print BEROOT "/" $3
+    }' | uniq
   return 0
 }
 
 # get_current_be: void -> bename
 get_current_be() {
     mount | grep " on / " | sed -r "s;^.*/(.*) on / .*;\1;g"
+    return 0
+}
+
+get_active_be() {
+  echo $BOOTFS | sed -r "s;^.*/(.*) on / .*;\1;g"
+  return 0
+}
+
+get_bebase() {
+  printf "%s/%s" $POOL $BEDS
+  return 0
+}
+
+# snapshot_exists: fullsnapname -> 0|1
+snapshot_exists() {
+    zfs list -H -o name -t snapshot | grep "^$1$" > /dev/null
+    return $?
+}
+
+# be_exists: fulldatasetname -> 0|1
+be_exists() {
+  zfs list -H -o name ${1} 1> /dev/null 2> /dev/null
+  return $?
+}
+
+# be_isclone: fulldatasetname -> 0|1
+be_isclone() { # 1=DATASET
+  if zfs list ${1} 1> /dev/null 2> /dev/null;then
+    local ORIGIN="$( zfs list -H -o origin ${1} )"
+    if [ "${ORIGIN}" = "-" ];then
+      # boot environment is not a clone
+      return 1
+    else
+      # boot environment is a clone
+      return 0
+    fi
+  else
+    # boot environment does not exist
+    return 2
+  fi
+}
+
+# check if system has a grub.cfg file and update it
+update_grub() {
+  if [ -e ${GRUB_CONFIG} ];then
+    if $GRUBCMD -o ${GRUB_CONFIG} 1> /dev/null 2> /dev/null
+    then
+      echo "GRUB configuration updated successfully"
+      return 0
+    else
+      echo "WARNING: Failed to update GRUB configuration"
+      return 1
+    fi
+  fi
 }
 
 cmd_list() {
@@ -89,7 +153,7 @@ cmd_list() {
       (H) OPTION_H=1 ;;
       (s) OPTION_s=1
           OPTION_a=1 ;;
-      (*) usage    ;;
+      (*) return usage    ;;
     esac
   done
 
@@ -274,8 +338,18 @@ cmd_list() {
 }
 
 cmd_create() {
-  echo "Not Implemented"
-  return 1
+    local cc_clearsnap=0
+    local cc_activate=0
+    local cc_bename=${@:$#}
+    
+    while getopts "ae:" cc_pnam "$@"; do
+        #echo "$cc_pnam: $OPTARG"
+        case $cc_pnam in
+            a) cc_activate=1 ;;
+            e) cc_source=$OPTARG ;;
+            *) return usage ;;
+        esac
+    done
 }
 
 cmd_destroy() {
@@ -289,8 +363,37 @@ cmd_mount() {
 }
 
 cmd_activate() {
-  echo "Not Implemented"
-  return 1
+  [ ${#} -eq 1 ] || return usage
+  local be=$(get_bebase)/$1
+  if ! be_exists $be; then
+    echo "ERROR: Boot environment '$1' does not exist"
+    return 1
+  fi
+  if ! zpool set bootfs=${be} ${POOL} 1> /dev/null 2> /dev/null;then
+    echo "ERROR: Failed to activate '${1}' boot environment" >2
+    return 1
+  fi
+  # execute ZFS LIST only once
+  ZFS_LIST=$( zfs list -t filesystem -H -o name -r $(get_bebase) )
+  # disable automatic mount on all inactive boot environments
+  echo "${ZFS_LIST}" \
+    | grep -v "^$(get_bebase)$" \
+    | grep -v "^${be}$" \
+    | grep -v "^${be}/" \
+    | while read NAME; do
+        zfs set canmount=noauto ${NAME}
+      done
+  echo "${ZFS_LIST}" \
+    | grep -E "^${be}(/|$)" \
+    | while read NAME; do
+        zfs set canmount=on ${NAME}
+        while be_isclone ${NAME};do
+          zfs promote ${NAME}
+        done
+      done
+  update_grub
+  echo "Activated successfully"
+  return 0
 }
 
 cmd_rename() {
