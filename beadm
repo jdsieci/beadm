@@ -554,8 +554,38 @@ cmd_destroy() {
 }
 
 cmd_mount() {
+  local bename=${1}
+  local be=$(get_bebase)/${bename}
+  if ! be_exists $be; then
+    echo "ERROR: Boot environment '$1' does not exist"
+    return 1
+  fi
+  zfs list -H -o name,mountpoint -r ${be} \
+    | while read NAME MOUNTPOINT;do
+      zfs set beadm:mountpoint=${MOUNTPOINT} ${NAME}
+      zfs set canmount=noauto ${NAME}
+    done
   echo "Not Implemented"
   return 1
+}
+
+cmd_unmount() {
+  local bename=${1}
+  local be=$(get_bebase)/${bename}
+  if ! be_exists $be; then
+    echo "ERROR: Boot environment '$1' does not exist"
+    return 1
+  fi
+  zfs list -H -o name,beadm:mountpoint -r ${be} \
+    | while read NAME MOUNTPOINT;do
+      zfs set mountpoint=${MOUNTPOINT} ${NAME}
+    done
+  echo "Not Implemented"
+  return 1
+}
+cmd_umount(){
+  cmd_unmount $@
+  return $?
 }
 
 cmd_activate() {
