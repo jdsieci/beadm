@@ -10,6 +10,12 @@ unset LC_ALL
 unset LANG
 unset LC_TIME
 
+if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
+then
+  echo "beadm 1.0.0 2018/08/08"
+  exit 0
+fi
+
 if find /lib/modules/$(uname -r)/ -name 'zfs.ko*' -exec false {} +;then
   echo "ERROR: ZFS modules not found" >&2
   exit 1
