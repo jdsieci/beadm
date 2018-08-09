@@ -465,7 +465,7 @@ cmd_list() {
         }
       }
 
-    }'
+    }' 2>/dev/null
   return 0
 }
 
@@ -555,7 +555,6 @@ cmd_destroy() {
         local origin=$( zfs list -H -o origin ${bepath} )
         if $forced ;then
           remove_snapshots=true
-        #elif [ "$(get_creationdate ${bepath})" != "$(get_creationdate $origin)" ];then
         elif [ $(get_creationdate -u ${bepath}) -gt $(get_creationdate -u $origin) ];then
           origin=$(basename $origin)
           echo "Boot environment '${bename}' was created from existing snapshot"
@@ -586,13 +585,13 @@ cmd_destroy() {
               done
             done
       fi
+      update_grub
       echo "Destroyed successfully"
       ;;
     *)
       echo "Boot environment '${bename}' has not been destroyed"
       ;;
   esac
-
   return 0
 }
 
@@ -700,6 +699,7 @@ cmd_rename() {
   if ! zfs rename $(get_bebase)/$old_bename $(get_bebase)/$new_bename; then
     return $?
   fi
+  update_grub
   return 0
 }
 
