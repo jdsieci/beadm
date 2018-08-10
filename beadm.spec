@@ -1,15 +1,15 @@
-Name:		zfs-beadm
-Version:	1.0.1
-Release:	1%{?dist}
-Summary:	Beadm is used to setup and interact with Boot Environments with ZFS.
-Provides:	beadm
+Name:           zfs-beadm
+Version:        1.0.1
+Release:        2%{?dist}
+Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
+Provides:       beadm = %{version}
 
-License:	GPL
-URL:		https://github.com/jdsieci/beadm
-Source0:	https://github.com/jdsieci/beadm/archive/v%{version}/beadm-%{version}.tar.gz
+License:        GPL
+URL:            https://github.com/jdsieci/beadm
+Source0:        https://github.com/jdsieci/beadm/archive/v%{version}/beadm-%{version}.tar.gz
 
-BuildArch:	noarch
-Requires:	zfs
+BuildArch:      noarch
+Requires:       zfs
 
 
 %description
@@ -19,8 +19,9 @@ while preserving the old system environment in a separate ZFS dataset.
 
 
 %package dracut
-Summary:	Dracut module
-BuildRequires:	pkgconfig(dracut)
+Summary:        Dracut module
+BuildRequires:  pkgconfig(dracut)
+Requires:       %{name}
 
 %description dracut
 This package contains a dracut module used to construct an initramfs
@@ -54,6 +55,9 @@ install -D -pm 644 src/dracut.conf.d/90-zfs-beadm.conf %{buildroot}%(pkg-config 
 %(pkg-config --variable=dracutconfdir dracut)/90-zfs-beadm.conf
 
 %changelog
+* Fri Aug 10 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.0.1-2
+- Added missing dependency for dracut subpackage
+
 * Thu Aug 09 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.0.1-1
 - Update to version 1.0.1
 
