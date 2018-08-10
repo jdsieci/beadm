@@ -28,7 +28,7 @@ image which is Boot Environments on ZFS aware
 
 
 %prep
-%setup -q -n beadm-%{version}
+%setup -q
 
 %build
 cp -f src/beadm.1 .
