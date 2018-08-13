@@ -30,7 +30,7 @@ unset LC_TIME
 
 if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
 then
-  echo "beadm 1.0.0 2018/08/08"
+  echo "beadm 1.0.2 2018/08/08"
   exit 0
 fi
 
@@ -635,7 +635,12 @@ cmd_unmount() {
     echo "Boot environment '$bename' not mounted"
     return 0
   fi
-  zfs umount ${be}
+  if ! zfs umount ${be} 2>/dev/null;then
+    zfs mount | awk -vBEPATH=${be} '$1 ~ BEPATH{print$2}'| sort -r \
+      | while read mountpoint; do
+        zfs umount ${mountpoint}
+      done
+  fi
   local mountroot=$(zfs get -H -o value mountpoint ${be})
   zfs list -H -o name,beadm:mountpoint -r ${be} \
     | while read NAME MOUNTPOINT;do

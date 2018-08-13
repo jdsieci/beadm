@@ -1,5 +1,5 @@
 Name:           zfs-beadm
-Version:        1.0.1
+Version:        1.0.2
 Release:        2%{?dist}
 Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
 Provides:       beadm = %{version}
@@ -55,6 +55,9 @@ install -D -pm 644 src/dracut.conf.d/90-zfs-beadm.conf %{buildroot}%(pkg-config 
 %(pkg-config --variable=dracutconfdir dracut)/90-zfs-beadm.conf
 
 %changelog
+* Mon Aug 13 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.0.2-1
+- Fixed unmounting noninherited mountpoints
+
 * Fri Aug 10 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.0.1-2
 - Added missing dependency for dracut subpackage
 
