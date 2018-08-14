@@ -129,12 +129,13 @@ get_bebase() {
 
 # get_creationdate: dataset/snapshot -> normalize creation date
 get_creationdate(){
-  local dataset=${@:$#}
-  while getopts "u" gc_pnam "$@";do
+  while getopts "u" gc_pnam;do
     case $gc_pnam in
       u) unix=true;;
     esac
   done
+  shift $((OPTIND-1))
+  local dataset=$1
   local fmt=$( $unix && echo -n "%s" || echo -n "%Y-%m-%d-%H:%M" )
   local creation=$(zfs list -H -o creation ${dataset} )
   printf "%s" $( date --date "${creation}" +"$fmt" )
@@ -277,8 +278,7 @@ cmd_list() {
   OPTION_a=0
   OPTION_D=0
   OPTION_s=0
-  while getopts "aDHs" OPT
-  do
+  while getopts "aDHs" OPT;do
     case ${OPT} in
       (a) OPTION_a=1 ;;
       (D) OPTION_D=1 ;;
@@ -507,10 +507,10 @@ cmd_create() {
 }
 
 cmd_destroy() {
-  local bename=${@:$#}
+  local destroyed=false
   local CHOICE=N
   local forced=false
-  while getopts "F" cd_cpnam "$@";do
+  while getopts "F" cd_cpnam;do
     case $cd_pnam in
       F) forced=true
         CHOICE=Y
@@ -518,80 +518,87 @@ cmd_destroy() {
       *) usage; return $? ;;
     esac
   done
-  if [ $(get_active_be) == "$bename" ];then
-    echo "ERROR: Cannot destroy active boot environment" >&2
-    return 1
-  fi
-  local bepath=$(get_bebase)/$bename
-  if ! be_exists $bepath;then
-    echo "ERROR: Boot environment '$bename' does not exist" >&2
-    return 1
-  fi
-  if ! $forced ;then
-    echo "Are you sure you want to destroy '${bename}'?"
-    echo -n "This action cannot be undone (y/[n]): "
-    read CHOICE
-  fi
-  case ${CHOICE} in
-    Y|y|[Yy][Ee][Ss])
-      if is_snapshot $bepath;then
-        if ! zfs destroy -r $bepath 1>/dev/null 2>/dev/null;then
-          echo "ERROR: Snapshot '${bename}' is origin for other boot environment" >&2
-          return 1
-        fi
-      else
-        if be_isclone $bepath;then
-          # promote clones dependent on snapshots used by destroyed BE
-          zfs list -H -t filesystem,snapshot,volume -o name,origin -r ${POOL} \
-            | while read NAME ORIGIN;do
-              #echo "${ORIGIN}" | grep -E "${bepath}(/.*@|@)"
-              if echo "${ORIGIN}" | grep -q -E "${bepath}(/.*@|@)" 2>/dev/null;then
-                zfs promote ${NAME}
-              fi
-            done
-            ORIGIN_SNAPSHOTS=$( zfs list -H -t filesystem,snapshot,volume -o origin -r ${bepath} | awk -F "/" '/^-$/{next}{print $NF}' | sort -u )
-
-        fi
-        local origin=$( zfs list -H -o origin ${bepath} )
-        if $forced ;then
-          remove_snapshots=true
-        elif [ $(get_creationdate -u ${bepath}) -gt $(get_creationdate -u $origin) ];then
-          origin=$(basename $origin)
-          echo "Boot environment '${bename}' was created from existing snapshot"
-          echo -n "Destroy '${origin}' snapshot? (y/[n]): "
-          read CHOICE
-          case ${CHOICE} in
-            Y|y|[Yy][Ee][Ss])
-              remove_snapshots=true
-              ;;
-            *)
-              remove_snapshots=false
-              echo "Origin snapshot '${origin}' will be preserved"
-              ;;
-          esac
+  shift $((OPTIND-1))
+  while [[ $# -gt 0 ]]; do
+    local bename=$1
+    if [ $(get_active_be) == "$bename" ];then
+      echo "ERROR: Cannot destroy active boot environment '$bename'" >&2
+      return 1
+    fi
+    local bepath=$(get_bebase)/$bename
+    if ! be_exists $bepath;then
+      echo "ERROR: Boot environment '$bename' does not exist" >&2
+      return 1
+    fi
+    if ! $forced ;then
+      echo "Are you sure you want to destroy '${bename}'?"
+      echo -n "This action cannot be undone (y/[n]): "
+      read CHOICE
+    fi
+    case ${CHOICE} in
+      Y|y|[Yy][Ee][Ss])
+        if is_snapshot $bepath;then
+          if ! zfs destroy -r $bepath 1>/dev/null 2>/dev/null;then
+            echo "ERROR: Snapshot '${bename}' is origin for other boot environment" >&2
+            return 1
+          fi
         else
-          remove_snapshots=true
-        fi
-        # destroy boot environment
-        zfs destroy -r ${bepath}
-        local snapshots=$( zfs list -H -t snapshot -o name -r ${POOL} )
-        echo "${ORIGIN_SNAPSHOTS}" \
-          | while read S;do
-            echo "${snapshots}" | grep -E "/${S}$" \
-              | while read I;do
-                 if $remove_snapshots ;then
-                   zfs destroy ${I}
-                 fi
+          if be_isclone $bepath;then
+            # promote clones dependent on snapshots used by destroyed BE
+            zfs list -H -t filesystem,snapshot,volume -o name,origin -r ${POOL} \
+              | while read NAME ORIGIN;do
+                #echo "${ORIGIN}" | grep -E "${bepath}(/.*@|@)"
+                if echo "${ORIGIN}" | grep -q -E "${bepath}(/.*@|@)" 2>/dev/null;then
+                  zfs promote ${NAME}
+                fi
               done
-            done
-      fi
-      update_grub
-      echo "Destroyed successfully"
-      ;;
-    *)
-      echo "Boot environment '${bename}' has not been destroyed"
-      ;;
-  esac
+              ORIGIN_SNAPSHOTS=$( zfs list -H -t filesystem,snapshot,volume -o origin -r ${bepath} | awk -F "/" '/^-$/{next}{print $NF}' | sort -u )
+          fi
+          local origin=$( zfs list -H -o origin ${bepath} )
+          if $forced ;then
+            remove_snapshots=true
+          elif [ $(get_creationdate -u ${bepath}) -gt $(get_creationdate -u $origin) ];then
+            origin=$(basename $origin)
+            echo "Boot environment '${bename}' was created from existing snapshot"
+            echo -n "Destroy '${origin}' snapshot? (y/[n]): "
+            read CHOICE
+            case ${CHOICE} in
+              Y|y|[Yy][Ee][Ss])
+                remove_snapshots=true
+                ;;
+              *)
+                remove_snapshots=false
+                echo "Origin snapshot '${origin}' will be preserved"
+                ;;
+            esac
+          else
+            remove_snapshots=true
+          fi
+          # destroy boot environment
+          zfs destroy -r ${bepath}
+          local snapshots=$( zfs list -H -t snapshot -o name -r ${POOL} )
+          echo "${ORIGIN_SNAPSHOTS}" \
+            | while read S;do
+              echo "${snapshots}" | grep -E "/${S}$" \
+                | while read I;do
+                   if $remove_snapshots ;then
+                     zfs destroy ${I}
+                   fi
+                done
+              done
+        fi
+        echo "Destroyed successfully"
+        destroyed=true
+        ;;
+      *)
+        echo "Boot environment '${bename}' has not been destroyed"
+        ;;
+    esac
+    shift
+  done
+  if $destroyed; then
+    update_grub
+  fi
   return 0
 }
 
