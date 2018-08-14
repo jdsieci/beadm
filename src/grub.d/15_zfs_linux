@@ -1,0 +1,54 @@
+#!/bin/sh
+set -e
+
+#
+#   grub-mkconfig helper script for ZFS boot environments
+#   Copyright (c) 2018 Jerzy Drozdz (t0fik)
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+# Do something only for zfs
+if [[ x"$GRUB_FS" != x"zfs" ]];then
+  exit 0
+fi
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+sbindir=${prefix}/sbin
+
+
+beadm=${sbindir}/beadm
+
+. "$pkgdatadir/grub-mkconfig_lib"
+
+export TEXTDOMAIN=grub
+export TEXTDOMAINDIR="${datarootdir}/locale"
+
+CLASS="--class gnu-linux --class gnu --class os --unrestricted"
+
+
+
+if [ -z "$boot_device_id" ]; then
+  boot_device_id="$(grub_get_device_id "${GRUB_DEVICE}")"
+fi
+
+linuxefi="linuxefi"
+be_list=$( ${beadm} | grep -v cut -f1 )
+
+if [[ x"
+echo "submenu '$(gettext_printf "Other Boot Environments" | grub_quote)' \$menuentry_id_option 'gnulinux-advanced-$boot_device_id' {"
+
+echo "}"
