@@ -19,7 +19,7 @@ set -e
 #
 
 
-# Do something only for zfs
+# Only ZFS is interesting
 if [[ x"$GRUB_FS" != x"zfs" ]];then
   exit 0
 fi
@@ -46,9 +46,18 @@ if [ -z "$boot_device_id" ]; then
 fi
 
 linuxefi="linuxefi"
-be_list=$( ${beadm} | grep -v cut -f1 )
+be_list=$( ${beadm} list -H|awk '!match($2,"R"){print $1}' )
 
-if [[ x"
-echo "submenu '$(gettext_printf "Other Boot Environments" | grub_quote)' \$menuentry_id_option 'gnulinux-advanced-$boot_device_id' {"
-
-echo "}"
+if [[ x"${be_list}" != "x" ]];then
+  rpool=`${grub_probe} --device ${GRUB_DEVICE} --target=fs_label 2>/dev/null || true`
+  echo "submenu '$(gettext_printf "Other Boot Environments" | grub_quote)' \$menuentry_id_option 'gnulinux-advanced-$boot_device_id' {"
+  while read be;do
+    be_root=$(${beadm} mount ${be})
+    bootfs=$(make_system_path_relative_to_its_root /beadm/${be} | sed -e "s,@$,,")
+    LINUX_ROOT_DEVICE="ZFS=${rpool}${bootfs}"
+    echo ${bootfs}
+  done <<EOF
+${be_list}
+EOF
+  echo "}"
+fi
