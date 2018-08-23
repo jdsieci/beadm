@@ -30,7 +30,7 @@ unset LC_TIME
 
 if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
 then
-  echo "beadm 1.0.4 2018/08/23"
+  echo "beadm 1.1.0 2018/08/23"
   exit 0
 fi
 
@@ -621,6 +621,7 @@ cmd_mount() {
   fi
   if be_is_mounted $be; then
     echo "Boot environment '$bename' already mounted" >&2
+    $prmount && zfs get -H -o value mountpoint ${be}
     return 0
   fi
   zfs list -H -o name,mountpoint -r ${be} \
@@ -659,6 +660,10 @@ cmd_unmount() {
   local be=$(get_bebase)/${bename}
   if ! be_exists $be; then
     echo "ERROR: Boot environment '$1' does not exist" >&2
+    return 1
+  fi
+  if [[ "${bename}" = "$(get_current_be)" ]];then
+    echo "ERROR: Cannot unmount current BE" >&2
     return 1
   fi
   if ! be_is_mounted $be; then
