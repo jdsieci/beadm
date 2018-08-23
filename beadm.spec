@@ -1,6 +1,6 @@
 Name:           zfs-beadm
 Version:        1.1.0
-Release:        2%{?dist}
+Release:        2.1%{?dist}
 Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
 Provides:       beadm = %{version}
 
@@ -30,7 +30,7 @@ image which is Boot Environments on ZFS aware
 %package grub2-tools
 Summary:        GRUB2 helper scripts
 Requires:       %{name} >= 1.1.0
-PreReq:         grub2-tools = 2.02
+PreReq:         grub2-tools = 1:2.02
 
 %description grub2-tools
 This package contains scripts to generate GRUB2 config with
@@ -74,6 +74,9 @@ install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 %{_sysconfdir}/grub.d/
 
 %changelog
+* Thu Aug 23 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.0-2.1
+- Fixed grub2-tools requisite
+
 * Thu Aug 23 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.0-2
 - Fixed: package name mismatch
 - Added minimal version of beadm for grub2-tools subpackage
