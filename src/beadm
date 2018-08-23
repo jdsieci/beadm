@@ -265,10 +265,10 @@ update_grub() {
   if [ -e ${GRUB_CONFIG} ];then
     if $GRUBCMD -o ${GRUB_CONFIG} 1> /dev/null 2> /dev/null
     then
-      echo "GRUB configuration updated successfully"
+      echo "GRUB configuration updated successfully" >&2
       return 0
     else
-      echo "WARNING: Failed to update GRUB configuration"
+      echo "WARNING: Failed to update GRUB configuration" >&2
       return 1
     fi
   fi
@@ -484,18 +484,18 @@ cmd_create() {
   done
   if [ -n "$cc_source" ];then
     if ! be_exists $(get_bebase)/$cc_source; then
-      echo "ERROR: Boot environment '$cc_source' does not exist"
+      echo "ERROR: Boot environment '$cc_source' does not exist" >&2
       return 1
     fi
     if be_exists $(get_bebase)/$cc_bename; then
-      echo "ERROR: Boot environment '$cc_bename' does exists"
+      echo "ERROR: Boot environment '$cc_bename' does exists" >&2
       return 1
     fi
     be_new $(get_bebase)/$cc_source $(get_bebase)/$cc_bename || return 1
   else
     if is_snapshot $cc_bename;then
       if ! zfs snapshot -r $(get_bebase)/$cc_bename 1>/dev/null 2>/dev/null;then
-        echo "ERROR: Cannot create '$cc_bename' recursive snapshot"
+        echo "ERROR: Cannot create '$cc_bename' recursive snapshot" >&2
         return 1
       fi
     else
@@ -568,7 +568,7 @@ cmd_destroy() {
                 ;;
               *)
                 remove_snapshots=false
-                echo "Origin snapshot '${origin}' will be preserved"
+                echo "Origin snapshot '${origin}' will be preserved" >&2
                 ;;
             esac
           else
@@ -587,11 +587,11 @@ cmd_destroy() {
                 done
               done
         fi
-        echo "Destroyed successfully"
+        echo "Destroyed successfully" >&2
         destroyed=true
         ;;
       *)
-        echo "Boot environment '${bename}' has not been destroyed"
+        echo "Boot environment '${bename}' has not been destroyed" >&2
         ;;
     esac
     shift
@@ -610,8 +610,8 @@ cmd_mount() {
     return 1
   fi
   if be_is_mounted $be; then
-    echo "ERROR: Boot environment '$bename' already mounted" >&2
-    return 1
+    echo "Boot environment '$bename' already mounted" >&2
+    return 0
   fi
   zfs list -H -o name,mountpoint -r ${be} \
     | while read NAME MOUNTPOINT;do
@@ -635,11 +635,11 @@ cmd_unmount() {
   local bename=${1}
   local be=$(get_bebase)/${bename}
   if ! be_exists $be; then
-    echo "ERROR: Boot environment '$1' does not exist"
+    echo "ERROR: Boot environment '$1' does not exist" >&2
     return 1
   fi
   if ! be_is_mounted $be; then
-    echo "Boot environment '$bename' not mounted"
+    echo "Boot environment '$bename' not mounted" >&2
     return 0
   fi
   if ! zfs umount ${be} 2>/dev/null;then
@@ -667,7 +667,7 @@ cmd_activate() {
   [ ${#} -eq 1 ] || (usage; return $?)
   local be=$(get_bebase)/$1
   if ! be_exists $be; then
-    echo "ERROR: Boot environment '$1' does not exist"
+    echo "ERROR: Boot environment '$1' does not exist" >&2
     return 1
   fi
   if ! zpool set bootfs=${be} ${POOL} 1> /dev/null 2> /dev/null;then
@@ -693,7 +693,7 @@ cmd_activate() {
         done
       done
   update_grub
-  echo "Activated successfully"
+  echo "Activated successfully" >&2
   return 0
 }
 
@@ -705,7 +705,7 @@ cmd_rename() {
   local old_bename=${1}
   local new_bename=${2}
   if ! be_exists $(get_bebase)/$old_bename; then
-    echo "ERROR: Boot environment '$1' does not exist"
+    echo "ERROR: Boot environment '$1' does not exist" >&2
     return 1
   fi
   if ! zfs rename $(get_bebase)/$old_bename $(get_bebase)/$new_bename; then
