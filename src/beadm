@@ -662,6 +662,10 @@ cmd_unmount() {
     echo "ERROR: Boot environment '$1' does not exist" >&2
     return 1
   fi
+  if [[ "${bename}" = "$(get_current_be)" ]];then
+    echo "ERROR: Cannot unmount current BE" >&2
+    return 1
+  fi
   if ! be_is_mounted $be; then
     echo "Boot environment '$bename' not mounted" >&2
     return 0
