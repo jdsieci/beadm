@@ -621,6 +621,7 @@ cmd_mount() {
   fi
   if be_is_mounted $be; then
     echo "Boot environment '$bename' already mounted" >&2
+    $prmount && zfs get -H -o value mountpoint ${be}
     return 0
   fi
   zfs list -H -o name,mountpoint -r ${be} \
