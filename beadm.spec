@@ -69,11 +69,14 @@ install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 %defattr(-,root,root,-)
 %(pkg-config --variable=dracutconfdir dracut)/90-zfs-beadm.conf
 
-%files grub2
+%files grub2-tools
 %defattr(-,root,root,-)
 %{_sysconfdir}/grub.d/
 
 %changelog
+* Thu Aug 23 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.0-2
+- Fixed: package name mismatch
+
 * Thu Aug 23 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.0-1
 - Added helper scripts for GRUB2
 - FIX: beadm tries umount current be
