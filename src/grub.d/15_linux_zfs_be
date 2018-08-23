@@ -165,12 +165,13 @@ if [ -z "$boot_device_id" ]; then
 fi
 
 be_list=$( ${beadm} list -H|awk '!match($2,"R"){print $1}' )
+be_current=$( ${beadm} list -H|awk '!match($2,"N"){print $1}' )
 
 if [[ x"${be_list}" != "x" ]];then
   rpool=`${grub_probe} --device ${GRUB_DEVICE} --target=fs_label 2>/dev/null || true`
   echo "submenu '$(gettext_printf "Other Boot Environments" | grub_quote)' \$menuentry_id_option 'gnulinux-advanced-$boot_device_id' {"
   while read be;do
-    be_root=$(${beadm} mount -m ${be})
+    be_root=$(${beadm} mount -m ${be} 2>/dev/null )
     bootfs=$(make_system_path_relative_to_its_root ${be_root} | sed -e "s,@$,,")
     LINUX_ROOT_DEVICE="ZFS=${rpool}${bootfs}"
     list=
@@ -203,7 +204,7 @@ if [[ x"${be_list}" != "x" ]];then
     linux_entry "${OS}" "${version}" advanced standard \
                 "${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
 
-    ${beadm} umount ${be}
+    ${beadm} umount ${be} 2>/dev/null || true
   done <<EOF
 ${be_list}
 EOF
