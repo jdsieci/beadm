@@ -1,5 +1,5 @@
 Name:           zfs-beadm
-Version:        1.0.4
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
 Provides:       beadm = %{version}
@@ -27,6 +27,21 @@ Requires:       %{name}
 This package contains a dracut module used to construct an initramfs
 image which is Boot Environments on ZFS aware
 
+%package grub2-tools
+Summary:        GRUB2 helper scripts
+Requires:       %{name}
+PreReq:         grub2-tools = 2.02
+
+%description grub2-tools
+This package contains scripts to generate GRUB2 config with
+Boot Environment support.
+
+%post grub2-tools
+chmod -x %{_sysconfdir}/grub.d/10_linux
+
+%preun grub2-tools
+[[ $1 != 0 ]] && exit 0
+chmod +x %{_sysconfdir}/grub.d/10_linux
 
 %prep
 %setup -q
@@ -37,12 +52,12 @@ gzip beadm.1
 
 %install
 install -d %{buildroot}%{_sbindir}
-install -d %{buildroot}%{_sysconfdir}
+install -d %{buildroot}%{_sysconfdir}/grub.d
 install -pm 755 src/beadm %{buildroot}%{_sbindir}/
 install -pm 644 src/beadm.conf %{buildroot}%{_sysconfdir}/
 install -D -pm 644 beadm.1.gz %{buildroot}%{_mandir}/man1/beadm.1.gz
 install -D -pm 644 src/dracut.conf.d/90-zfs-beadm.conf %{buildroot}%(pkg-config --variable=dracutconfdir dracut)/90-zfs-beadm.conf
-
+install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 
 %files
 %defattr(-,root,root,-)
@@ -54,7 +69,15 @@ install -D -pm 644 src/dracut.conf.d/90-zfs-beadm.conf %{buildroot}%(pkg-config 
 %defattr(-,root,root,-)
 %(pkg-config --variable=dracutconfdir dracut)/90-zfs-beadm.conf
 
+%files grub2
+%defattr(-,root,root,-)
+%{_sysconfdir}/grub.d/
+
 %changelog
+* Thu Aug 23 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.0-1
+- Added helper scripts for GRUB2
+- FIX: beadm tries umount current be
+
 * Thu Aug 23 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.0.4-1
 - Added printing mountpoint after mounting BE
 - Minor bug fixes
