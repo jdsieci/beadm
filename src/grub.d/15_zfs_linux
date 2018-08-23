@@ -39,13 +39,131 @@ export TEXTDOMAINDIR="${datarootdir}/locale"
 
 CLASS="--class gnu-linux --class gnu --class os --unrestricted"
 
+mktitle ()
+{
+  local title_type
+  local version
+  local OS_NAME
+  local OS_VERS
+  local be_root
+
+  title_type=$1 && shift
+  version=$1 && shift
+  if [[ $# -gt 0 ]];then
+    be_root=$1 && shift
+  fi
+
+  OS_NAME="$(eval $(grep ^NAME= ${be_root}/etc/os-release) ; echo ${NAME})"
+  OS_VERS="$(eval $(grep ^VERSION= ${be_root}/etc/os-release) ; echo ${VERSION})"
+
+  case $title_type in
+    recovery)
+      title=$(printf '%s (%s) %s (recovery mode) @be:%s' \
+                     "${OS_NAME}" "${version}" "${OS_VERS}" "$be")
+      ;;
+    *)
+      title=$(printf '%s (%s) %s @be:%s' \
+                     "${OS_NAME}" "${version}" "${OS_VERS}" "$be")
+      ;;
+  esac
+  echo -n ${title}
+}
+
+linux_entry ()
+{
+  os="$1"
+  version="$2"
+  type="$3"
+  isdebug="$4"
+  args="$5"
+
+  linuxefi="linuxefi"
+  initrdefi="initrdefi"
+
+  if [ -z "$boot_device_id" ]; then
+      boot_device_id="$(grub_get_device_id "${GRUB_DEVICE}")"
+  fi
+  if [ x$type != xsimple ] ; then
+      title=$(mktitle "$type" "$version" "$be_root")
+      if [ x"$title" = x"$GRUB_ACTUAL_DEFAULT" ] || [ x"Previous Linux versions>$title" = x"$GRUB_ACTUAL_DEFAULT" ]; then
+	  replacement_title="$(echo "Advanced options for ${OS}" | sed 's,>,>>,g')>$(echo "$title" | sed 's,>,>>,g')"
+	  quoted="$(echo "$GRUB_ACTUAL_DEFAULT" | grub_quote)"
+	  title_correction_code="${title_correction_code}if [ \"x\$default\" = '$quoted' ]; then default='$(echo "$replacement_title" | grub_quote)'; fi;"
+      fi
+      if [ x$isdebug = xdebug ]; then
+	  title="$title${GRUB_LINUX_DEBUG_TITLE_POSTFIX}"
+      fi
+      echo "menuentry '$(echo "$title" | grub_quote)' ${CLASS} \$menuentry_id_option 'gnulinux-$version-$type-$boot_device_id' {" | sed "s/^/$submenu_indentation/"
+  else
+      echo "menuentry '$(echo "$os" | grub_quote)' ${CLASS} \$menuentry_id_option 'gnulinux-simple-$boot_device_id' {" | sed "s/^/$submenu_indentation/"
+  fi
+  if [ x$type != xrecovery ] ; then
+      save_default_entry | grub_add_tab
+  fi
+
+  # Use ELILO's generic "efifb" when it's known to be available.
+  # FIXME: We need an interface to select vesafb in case efifb can't be used.
+  if [ "x$GRUB_GFXPAYLOAD_LINUX" = x ]; then
+      echo "	load_video" | sed "s/^/$submenu_indentation/"
+      if grep -qx "CONFIG_FB_EFI=y" "${config}" 2> /dev/null \
+	  && grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" "${config}" 2> /dev/null; then
+	  echo "	set gfxpayload=keep" | sed "s/^/$submenu_indentation/"
+      fi
+  else
+      if [ "x$GRUB_GFXPAYLOAD_LINUX" != xtext ]; then
+	  echo "	load_video" | sed "s/^/$submenu_indentation/"
+      fi
+      echo "	set gfxpayload=$GRUB_GFXPAYLOAD_LINUX" | sed "s/^/$submenu_indentation/"
+  fi
+
+  echo "	insmod gzio" | sed "s/^/$submenu_indentation/"
+
+  if [ x$dirname = x/ ]; then
+    if [ -z "${prepare_root_cache}" ]; then
+      prepare_root_cache="$(prepare_grub_to_access_device ${GRUB_DEVICE} | grub_add_tab)"
+    fi
+    printf '%s\n' "${prepare_root_cache}" | sed "s/^/$submenu_indentation/"
+  else
+    if [ -z "${prepare_boot_cache}" ]; then
+      prepare_boot_cache="$(prepare_grub_to_access_device ${GRUB_DEVICE_BOOT} | grub_add_tab)"
+    fi
+    printf '%s\n' "${prepare_boot_cache}" | sed "s/^/$submenu_indentation/"
+  fi
+  if [ -d /sys/firmware/efi ]; then
+    sed "s/^/$submenu_indentation/" << EOF
+	${linuxefi} ${rel_dirname}/${basename} root=${linux_root_device_thisversion} ro ${args}
+EOF
+  else
+    sed "s/^/$submenu_indentation/" << EOF
+	linux${sixteenbit} ${rel_dirname}/${basename} root=${linux_root_device_thisversion} ro ${args}
+EOF
+  fi
+  if test -n "${initrd}" ; then
+    if [ -d /sys/firmware/efi ]; then
+      sed "s/^/$submenu_indentation/" << EOF
+	${initrdefi} ${rel_dirname}/${initrd}
+EOF
+    else
+      sed "s/^/$submenu_indentation/" << EOF
+	initrd${sixteenbit} ${rel_dirname}/${initrd}
+EOF
+    fi
+  fi
+  if test -n "${fdt}" ; then
+    sed "s/^/$submenu_indentation/" << EOF
+	devicetree	${rel_dirname}/${fdt}
+EOF
+  fi
+  sed "s/^/$submenu_indentation/" << EOF
+}
+EOF
+}
 
 
 if [ -z "$boot_device_id" ]; then
   boot_device_id="$(grub_get_device_id "${GRUB_DEVICE}")"
 fi
 
-linuxefi="linuxefi"
 be_list=$( ${beadm} list -H|awk '!match($2,"R"){print $1}' )
 
 if [[ x"${be_list}" != "x" ]];then
@@ -53,9 +171,39 @@ if [[ x"${be_list}" != "x" ]];then
   echo "submenu '$(gettext_printf "Other Boot Environments" | grub_quote)' \$menuentry_id_option 'gnulinux-advanced-$boot_device_id' {"
   while read be;do
     be_root=$(${beadm} mount ${be})
-    bootfs=$(make_system_path_relative_to_its_root /beadm/${be} | sed -e "s,@$,,")
+    bootfs=$(make_system_path_relative_to_its_root ${be_root} | sed -e "s,@$,,")
     LINUX_ROOT_DEVICE="ZFS=${rpool}${bootfs}"
-    echo ${bootfs}
+    list=
+    for i in ${be_root}/boot/vmlinuz-* ${be_root}/vmlinuz-* ${be_root}/boot/kernel-* ; do
+      if grub_file_is_not_garbage "$i" ; then list="$list $i" ; fi
+    done
+    linux=$(version_find_latest $list)
+    basename=`basename $linux`
+    dirname=`dirname $linux`
+    rel_dirname=`make_system_path_relative_to_its_root $dirname`
+    version=`echo $basename | sed -e "s,^[^0-9]*-,,g"`
+    alt_version=`echo $version | sed -e "s,\.old$,,g"`
+    linux_root_device_thisversion="${LINUX_ROOT_DEVICE}"
+
+    initrd=
+    for i in "initrd.img-${version}" "initrd-${version}.img" "initrd-${version}.gz" \
+             "initrd-${version}" "initramfs-${version}.img" \
+             "initrd.img-${alt_version}" "initrd-${alt_version}.img" \
+             "initrd-${alt_version}" "initramfs-${alt_version}.img" \
+             "initramfs-genkernel-${version}" \
+             "initramfs-genkernel-${alt_version}" \
+             "initramfs-genkernel-${GENKERNEL_ARCH}-${version}" \
+             "initramfs-genkernel-${GENKERNEL_ARCH}-${alt_version}"; do
+      if test -e "${dirname}/${i}" ; then
+        initrd="$i"
+        break
+      fi
+    done
+    dirname=${dirname#$be_root}
+    linux_entry "${OS}" "${version}" advanced standard \
+                "${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
+
+    ${beadm} umount ${be}
   done <<EOF
 ${be_list}
 EOF
