@@ -30,7 +30,7 @@ unset LC_TIME
 
 if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
 then
-  echo "beadm 1.0.2 2018/08/08"
+  echo "beadm 1.0.4 2018/08/23"
   exit 0
 fi
 
@@ -510,7 +510,7 @@ cmd_destroy() {
   local destroyed=false
   local CHOICE=N
   local forced=false
-  while getopts "F" cd_cpnam;do
+  while getopts "F" cd_pnam;do
     case $cd_pnam in
       F) forced=true
         CHOICE=Y
@@ -603,6 +603,16 @@ cmd_destroy() {
 }
 
 cmd_mount() {
+  local prmount=false
+  while getopts "m" cm_pnam;do
+    case $cm_pnam in
+      m) prmount=true
+        ;;
+      *) usage; return $? ;;
+    esac
+  done
+  shift $((OPTIND-1))
+
   local bename=${1}
   local be=$(get_bebase)/${bename}
   if ! be_exists $be; then
@@ -628,10 +638,23 @@ cmd_mount() {
     | while read NAME;do
       zfs mount ${NAME}
     done
+  if $prmount; then 
+    zfs get -H -o value mountpoint ${be}
+  fi
   return 0
 }
 
 cmd_unmount() {
+  local OPTS
+  while getopts "f" cu_pnam;do
+    case $cu_pnam in
+      f) OPTS="-f"
+        ;;
+      *) usage; return $? ;;
+    esac
+  done
+  shift $((OPTIND-1))
+
   local bename=${1}
   local be=$(get_bebase)/${bename}
   if ! be_exists $be; then
@@ -642,10 +665,10 @@ cmd_unmount() {
     echo "Boot environment '$bename' not mounted" >&2
     return 0
   fi
-  if ! zfs umount ${be} 2>/dev/null;then
+  if ! zfs umount ${OPTS} ${be} 2>/dev/null;then
     zfs mount | awk -vBEPATH=${be} '$1 ~ BEPATH{print$2}'| sort -r \
       | while read mountpoint; do
-        zfs umount ${mountpoint}
+        zfs umount ${OPTS} ${mountpoint}
       done
   fi
   local mountroot=$(zfs get -H -o value mountpoint ${be})
