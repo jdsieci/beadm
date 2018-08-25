@@ -118,7 +118,7 @@ get_current_be() {
 }
 
 get_active_be() {
-  echo $BOOTFS | sed -r "s;^.*/(.*) on / .*;\1;g"
+  echo $BOOTFS | sed -r "s;^.*/(.*)$;\1;g"
   return 0
 }
 
