@@ -34,7 +34,8 @@ then
   exit 0
 fi
 
-if find /lib/modules/$(uname -r)/ -name 'zfs.ko*' -exec false {} +;then
+#if find /lib/modules/$(uname -r)/ -name 'zfs.ko*' -exec false {} +;then
+if ! lsmod |grep -q zfs ;then
   echo "ERROR: ZFS modules not found" >&2
   exit 1
 fi
@@ -502,6 +503,7 @@ cmd_create() {
       be_new ${ROOTFS} $(get_bebase)/$cc_bename || return 1
     fi
   fi
+  update_grub
   echo "Boot environment created"
   if [ x$cc_activate = x1 ]; then cmd_activate $cc_bename; fi
 }
@@ -615,21 +617,23 @@ cmd_mount() {
 
   local bename=${1}
   local be=$(get_bebase)/${bename}
+  local mountroot=/beadm/${bename}
   if ! be_exists $be; then
     echo "ERROR: Boot environment '$bename' does not exist" >&2
     return 1
   fi
   if be_is_mounted $be; then
     echo "Boot environment '$bename' already mounted" >&2
-    $prmount && echo /beadm/${bename}
+    $prmount && zfs mount| awk -v BE=${be} '$1==BE{print $2}'
     return 0
   fi
+  mkdir -p ${mountroot} 2>/dev/null
   zfs list -H -o name,mountpoint -r ${be} \
     | while read NAME MOUNTPOINT;do
-      mount -o zfsutil -t zfs ${NAME} /beadm/${bename}/${MOUNTPOINT}
+      mount -o zfsutil -t zfs ${NAME} ${mountroot}/${MOUNTPOINT}
     done
   if $prmount; then 
-    echo /beadm/${bename}
+    echo ${mountroot}
   fi
   return 0
 }
