@@ -621,26 +621,15 @@ cmd_mount() {
   fi
   if be_is_mounted $be; then
     echo "Boot environment '$bename' already mounted" >&2
-    $prmount && zfs get -H -o value mountpoint ${be}
+    $prmount && echo /beadm/${bename}
     return 0
   fi
   zfs list -H -o name,mountpoint -r ${be} \
     | while read NAME MOUNTPOINT;do
-      [[ ${MOUNTPOINT} =~ ^/beadm/${bename} ]] && continue
-      zfs set beadm:mountpoint=${MOUNTPOINT} ${NAME}
-      zfs set canmount=noauto ${NAME}
-      if [ "${NAME}" = "${be}" ];then
-        zfs set mountpoint=/beadm/${bename} ${NAME}
-      elif ! prop_is_inherited mountpoint ${NAME};then
-        zfs set mountpoint=/beadm/${bename}${MOUNTPOINT} ${NAME}
-      fi
-    done
-  zfs list -H -o name -s name -r ${be} \
-    | while read NAME;do
-      zfs mount ${NAME}
+      mount -o zfsutil -t zfs ${NAME} /beadm/${bename}/${MOUNTPOINT}
     done
   if $prmount; then 
-    zfs get -H -o value mountpoint ${be}
+    echo /beadm/${bename}
   fi
   return 0
 }
@@ -659,7 +648,7 @@ cmd_unmount() {
   local bename=${1}
   local be=$(get_bebase)/${bename}
   if ! be_exists $be; then
-    echo "ERROR: Boot environment '$1' does not exist" >&2
+    echo "ERROR: Boot environment '$bename' does not exist" >&2
     return 1
   fi
   if [[ "${bename}" = "$(get_current_be)" ]];then
@@ -670,19 +659,8 @@ cmd_unmount() {
     echo "Boot environment '$bename' not mounted" >&2
     return 0
   fi
-  if ! zfs umount ${OPTS} ${be} 2>/dev/null;then
-    zfs mount | awk -vBEPATH=${be} '$1 ~ BEPATH{print$2}'| sort -r \
-      | while read mountpoint; do
-        zfs umount ${OPTS} ${mountpoint}
-      done
-  fi
-  local mountroot=$(zfs get -H -o value mountpoint ${be})
-  zfs list -H -o name,beadm:mountpoint -r ${be} \
-    | while read NAME MOUNTPOINT;do
-      if ! prop_is_inherited mountpoint ${NAME};then
-        zfs set mountpoint=${MOUNTPOINT} ${NAME}
-      fi
-    done
+  local mountroot=$(zfs mount| awk -v BE=${be} '$1==BE{print $2}')
+  umount --recursive ${OPTS} ${mountroot}
   rm -fr ${mountroot}
   return 0
 }
