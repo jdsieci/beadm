@@ -30,7 +30,7 @@ unset LC_TIME
 
 if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
 then
-  echo "beadm 1.1.0 2018/08/23"
+  echo "beadm 1.1.2 2018/08/27"
   exit 0
 fi
 
