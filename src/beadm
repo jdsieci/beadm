@@ -34,7 +34,6 @@ then
   exit 0
 fi
 
-#if find /lib/modules/$(uname -r)/ -name 'zfs.ko*' -exec false {} +;then
 if ! lsmod |grep -q zfs ;then
   echo "ERROR: ZFS modules not found" >&2
   exit 1
