@@ -71,7 +71,6 @@ case x"$GRUB_FS" in
         be=$( ${beadm} list -H | awk 'match($2,"R"){print $1}' )
 	rpool=`${grub_probe} --device ${GRUB_DEVICE} --target=fs_label 2>/dev/null || true`
         be_root=$( ${beadm} mount -m ${be} 2>/dev/null )
-        echo "be_root=${be_root}" >&2
 	bootfs="`make_system_path_relative_to_its_root ${be_root} | sed -e "s,@$,,"`"
 	LINUX_ROOT_DEVICE="ZFS=${rpool}${bootfs}"
 	;;
