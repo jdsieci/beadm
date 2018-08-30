@@ -30,7 +30,7 @@ unset LC_TIME
 
 if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
 then
-  echo "beadm 1.1.4 2018/08/30"
+  echo "beadm 1.1.5 2018/08/30"
   exit 0
 fi
 
@@ -38,6 +38,26 @@ if ! lsmod |grep -q zfs ;then
   echo "ERROR: ZFS modules not found" >&2
   exit 1
 fi
+
+if [ -f /usr/local/etc/beadm.conf ]
+then
+  . /usr/local/etc/beadm.conf
+elif [ -f /etc/beadm.conf ]
+then
+  . /etc/beadm.conf
+fi
+
+# update GRUB bootloader instead of FreeBSD's loader(8)
+: ${GRUB="yes"}
+# GRUB mkconfig command path
+: ${GRUBCMD="/usr/sbin/grub2-mkconfig"}
+# Grub config path
+: ${GRUB_CONFIG="/boot/efi/EFI/fedora/grub.cfg"}
+#
+: ${INITRD="no"}
+
+GRUB=${GRUB,,}
+INITRD=${INITRD,,}
 
 if [ "x$INITRD" = "xyes" ];then
   ROOTFS=$( mount | awk '/ \/sysroot / {print $1}' )
@@ -63,21 +83,6 @@ if [ -z "${BOOTFS}" -o "${BOOTFS}" = "-" ];then
   echo "ERROR: ZFS boot pool '${POOL}' has unset 'bootfs' property" >&2
   exit 1
 fi
-
-if [ -f /usr/local/etc/beadm.conf ]
-then
-  . /usr/local/etc/beadm.conf
-elif [ -f /etc/beadm.conf ]
-then
-  . /etc/beadm.conf
-fi
-
-# update GRUB bootloader instead of FreeBSD's loader(8)
-: ${GRUB="YES"}
-# GRUB mkconfig command path
-: ${GRUBCMD="/usr/sbin/grub2-mkconfig"}
-# Grub config path
-: ${GRUB_CONFIG="/boot/efi/EFI/fedora/grub.cfg"}
 
 # use other prefix then the 'pool/ROOT/bename' default
 : ${BEDS="$( echo ${ROOTFS} | awk -F '/' '{print $2}' )"}
