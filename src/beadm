@@ -262,6 +262,9 @@ be_new(){
 
 # check if system has a grub.cfg file and update it
 update_grub() {
+  if [ "x$INITRD" = "xyes" ];then
+    return 0
+  fi
   if [ -e ${GRUB_CONFIG} ];then
     if $GRUBCMD -o ${GRUB_CONFIG} 1> /dev/null 2> /dev/null
     then
