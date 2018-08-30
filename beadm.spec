@@ -1,6 +1,6 @@
 Name:           zfs-beadm
 Version:        1.1.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
 Provides:       beadm = %{version}
 
@@ -53,10 +53,11 @@ gzip beadm.1
 %install
 install -d %{buildroot}%{_sbindir}
 install -d %{buildroot}%{_sysconfdir}/grub.d
+install -d %{buildroot}%(pkg-config --variable=dracutmodulesdir dracut)/90beadm
 install -pm 755 src/beadm %{buildroot}%{_sbindir}/
 install -pm 644 src/beadm.conf %{buildroot}%{_sysconfdir}/
 install -D -pm 644 beadm.1.gz %{buildroot}%{_mandir}/man1/beadm.1.gz
-install -d -p src/dracut/90beadm %{buildroot}%(pkg-config --variable=dracutmodulesdir dracut)/90beadm
+install -p src/dracut/90beadm/* %{buildroot}%(pkg-config --variable=dracutmodulesdir dracut)/90beadm/
 install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 
 %files
@@ -76,6 +77,9 @@ install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 
 
 %changelog
+* Thu Aug 30 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.3-2
+- Fixed lack of dracut module files
+
 * Thu Aug 30 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.3-1
 - Added dracut module
 
