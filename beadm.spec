@@ -1,6 +1,6 @@
 Name:           zfs-beadm
-Version:        1.1.3
-Release:        2.1%{?dist}
+Version:        1.1.4
+Release:        1%{?dist}
 Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
 Provides:       beadm = %{version}
 
@@ -77,6 +77,9 @@ install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 
 
 %changelog
+* Thu Aug 30 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.4-1
+- Added detection of rootfs for /sysroot when run in initrd
+
 * Thu Aug 30 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.3-2.1
 - Fixed files permissions in dracut module
 
