@@ -16,4 +16,9 @@ depends() {
 install() {
   inst "${moddir}/beadm.conf" "/etc/beadm.conf"
   dracut_install /sbin/beadm
+  dracut_install sort
+  dracut_install awk
+  dracut_install basename
+  dracut_install date
+  dracut_install cut
 }
