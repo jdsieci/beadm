@@ -28,7 +28,7 @@ unset LC_ALL
 unset LANG
 unset LC_TIME
 
-if [ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]
+if [[ "${1}" = "--version" -o "${1}" = "-version" -o "${1}" = "version" ]]
 then
   echo "beadm 1.1.6 2018/08/30"
   exit 0
@@ -39,10 +39,10 @@ if ! lsmod |grep -q zfs ;then
   exit 1
 fi
 
-if [ -f /usr/local/etc/beadm.conf ]
+if [[ -f /usr/local/etc/beadm.conf ]]
 then
   . /usr/local/etc/beadm.conf
-elif [ -f /etc/beadm.conf ]
+elif [[ -f /etc/beadm.conf ]]
 then
   . /etc/beadm.conf
 fi
@@ -59,7 +59,7 @@ fi
 GRUB=${GRUB,,}
 INITRD=${INITRD,,}
 
-if [ "x$INITRD" = "xyes" ];then
+if [[ "x$INITRD" = "xyes" ]];then
   ROOTFS=$( mount | awk '/ \/sysroot / {print $1}' )
 else
   ROOTFS=$( mount | awk '/ \/ / {print $1}' )
@@ -72,14 +72,14 @@ fi
 
 POOL=$( echo ${ROOTFS} | awk -F '/' '{print $1}' )
 
-if [ $( echo ${ROOTFS} | awk -F '/' '{print NF}' ) -lt 3 ];then
+if [[ $( echo ${ROOTFS} | awk -F '/' '{print NF}' ) -lt 3 ]];then
   echo "ERROR: This system is not configured for boot environments" >&2
   exit 1
 fi
 
 BOOTFS=$( zpool list -H -o bootfs ${POOL} )
 
-if [ -z "${BOOTFS}" -o "${BOOTFS}" = "-" ];then
+if [[ -z "${BOOTFS}" -o "${BOOTFS}" = "-" ]];then
   echo "ERROR: ZFS boot pool '${POOL}' has unset 'bootfs' property" >&2
   exit 1
 fi
@@ -104,7 +104,7 @@ usage() {
 }
 
 get_command() {
-  if [ "$(type -t "cmd_$1")" = "function" ]; then
+  if [[ "$(type -t "cmd_$1")" = "function" ]]; then
     printf "cmd_$1"
   else
     printf "usage"
@@ -127,25 +127,25 @@ get_current_be() {
 }
 
 get_active_be() {
-  echo $BOOTFS | sed -r "s;^.*/(.*)$;\1;g"
+  echo ${BOOTFS} | sed -r "s;^.*/(.*)$;\1;g"
   return 0
 }
 
 get_bebase() {
-  printf "%s/%s" $POOL $BEDS
+  printf "%s/%s" ${POOL} ${BEDS}
   return 0
 }
 
 # get_creationdate: dataset/snapshot -> normalize creation date
 get_creationdate(){
   while getopts "u" gc_pnam;do
-    case $gc_pnam in
+    case ${gc_pnam} in
       u) unix=true;;
     esac
   done
   shift $((OPTIND-1))
   local dataset=$1
-  local fmt=$( $unix && echo -n "%s" || echo -n "%Y-%m-%d-%H:%M" )
+  local fmt=$( ${unix} && echo -n "%s" || echo -n "%Y-%m-%d-%H:%M" )
   local creation=$(zfs list -H -o creation ${dataset} )
   printf "%s" $( date --date "${creation}" +"$fmt" )
   return 0
@@ -155,7 +155,7 @@ get_creationdate(){
 prop_is_inherited(){
   local property=$1
   local dataset=$2
-  if [ "$(zfs get ${property} -H -o source ${dataset})" = "local" ];then
+  if [[ "$(zfs get ${property} -H -o source ${dataset})" = "local" ]];then
     return 1
   fi
   return 0
@@ -182,7 +182,7 @@ be_exists() {
 # be_is_mounted: dataset -> 0|1
 be_is_mounted() {
   local dataset=${1}
-  if [ "$(zfs get -H -o value mounted ${dataset})" = "yes" ];then
+  if [[ "$(zfs get -H -o value mounted ${dataset})" = "yes" ]];then
     return 0
   fi
   return 1
@@ -192,7 +192,7 @@ be_is_mounted() {
 be_isclone() { # 1=DATASET
   if zfs list ${1} 1> /dev/null 2> /dev/null;then
     local ORIGIN="$( zfs list -H -o origin ${1} )"
-    if [ "${ORIGIN}" = "-" ];then
+    if [[ "${ORIGIN}" = "-" ]];then
       # boot environment is not a clone
       return 1
     else
@@ -212,7 +212,7 @@ be_new(){
   local new_be=$2
   local NAME_NEW=$( basename "${new_be}" )
   local NAME_SANITY=$( echo "${NAME_NEW}" | tr -c -d 'a-zA-Z0-9-_.,' )
-  if [ "${NAME_NEW}" != "${NAME_SANITY}" ]
+  if [[ "${NAME_NEW}" != "${NAME_SANITY}" ]]
   then
     echo "ERROR: Can not create boot environment with '${NAME_NEW}' name"
     echo
@@ -251,7 +251,7 @@ be_new(){
     | while read FS;do
         local OPTS=""
         while read NAME PROPERTY VALUE;do
-          if [ "${VALUE}" != "" ];then
+          if [[ "${VALUE}" != "" ]];then
             local OPTS="-o ${PROPERTY}=\"${VALUE}\" ${OPTS}"
           else
             local OPTS=""
@@ -271,11 +271,11 @@ be_new(){
 
 # check if system has a grub.cfg file and update it
 update_grub() {
-  if [ "x$INITRD" = "xyes" ];then
+  if [[ "x${INITRD}" = "xyes" ]];then
     return 0
   fi
-  if [ -e ${GRUB_CONFIG} ];then
-    if $GRUBCMD -o ${GRUB_CONFIG} 1> /dev/null 2> /dev/null
+  if [[ -e ${GRUB_CONFIG} ]];then
+    if ${GRUBCMD} -o ${GRUB_CONFIG} 1> /dev/null 2> /dev/null
     then
       echo "GRUB configuration updated successfully" >&2
       return 0
@@ -488,13 +488,13 @@ cmd_create() {
   
   while getopts "ae:" cc_pnam "$@"; do
     #echo "$cc_pnam: $OPTARG"
-    case $cc_pnam in
+    case ${cc_pnam} in
       a) cc_activate=1 ;;
       e) cc_source=$OPTARG ;;
       *) usage; return $? ;;
     esac
   done
-  if [ -n "$cc_source" ];then
+  if [[ -n "$cc_source" ]];then
     if ! be_exists $(get_bebase)/$cc_source; then
       echo "ERROR: Boot environment '$cc_source' does not exist" >&2
       return 1
@@ -503,20 +503,20 @@ cmd_create() {
       echo "ERROR: Boot environment '$cc_bename' does exists" >&2
       return 1
     fi
-    be_new $(get_bebase)/$cc_source $(get_bebase)/$cc_bename || return 1
+    be_new $(get_bebase)/${cc_source} $(get_bebase)/${cc_bename} || return 1
   else
-    if is_snapshot $cc_bename;then
-      if ! zfs snapshot -r $(get_bebase)/$cc_bename 1>/dev/null 2>/dev/null;then
-        echo "ERROR: Cannot create '$cc_bename' recursive snapshot" >&2
+    if is_snapshot ${cc_bename};then
+      if ! zfs snapshot -r $(get_bebase)/${cc_bename} 1>/dev/null 2>/dev/null;then
+        echo "ERROR: Cannot create '${cc_bename}' recursive snapshot" >&2
         return 1
       fi
     else
-      be_new ${ROOTFS} $(get_bebase)/$cc_bename || return 1
+      be_new ${ROOTFS} $(get_bebase)/${cc_bename} || return 1
     fi
   fi
   update_grub
   echo "Boot environment created"
-  if [ x$cc_activate = x1 ]; then cmd_activate $cc_bename; fi
+  if [[ x${cc_activate} = x1 ]]; then cmd_activate ${cc_bename}; fi
 }
 
 cmd_destroy() {
@@ -524,7 +524,7 @@ cmd_destroy() {
   local CHOICE=N
   local forced=false
   while getopts "F" cd_pnam;do
-    case $cd_pnam in
+    case ${cd_pnam} in
       F) forced=true
         CHOICE=Y
         ;;
@@ -534,16 +534,16 @@ cmd_destroy() {
   shift $((OPTIND-1))
   while [[ $# -gt 0 ]]; do
     local bename=$1
-    if [ $(get_active_be) == "$bename" ];then
-      echo "ERROR: Cannot destroy active boot environment '$bename'" >&2
+    if [[ $(get_active_be) == "${bename}" ]];then
+      echo "ERROR: Cannot destroy active boot environment '${bename}'" >&2
       return 1
     fi
-    local bepath=$(get_bebase)/$bename
-    if ! be_exists $bepath;then
-      echo "ERROR: Boot environment '$bename' does not exist" >&2
+    local bepath=$(get_bebase)/${bename}
+    if ! be_exists ${bepath};then
+      echo "ERROR: Boot environment '${bename}' does not exist" >&2
       return 1
     fi
-    if ! $forced ;then
+    if ! ${forced} ;then
       echo "Are you sure you want to destroy '${bename}'?"
       echo -n "This action cannot be undone (y/[n]): "
       read CHOICE
@@ -551,7 +551,7 @@ cmd_destroy() {
     case ${CHOICE} in
       Y|y|[Yy][Ee][Ss])
         if is_snapshot $bepath;then
-          if ! zfs destroy -r $bepath 1>/dev/null 2>/dev/null;then
+          if ! zfs destroy -r ${bepath} 1>/dev/null 2>/dev/null;then
             echo "ERROR: Snapshot '${bename}' is origin for other boot environment" >&2
             return 1
           fi
@@ -570,8 +570,8 @@ cmd_destroy() {
           local origin=$( zfs list -H -o origin ${bepath} )
           if $forced ;then
             remove_snapshots=true
-          elif [ $(get_creationdate -u ${bepath}) -gt $(get_creationdate -u $origin) ];then
-            origin=$(basename $origin)
+          elif [[ $(get_creationdate -u ${bepath}) -gt $(get_creationdate -u ${origin}) ]];then
+            origin=$(basename ${origin})
             echo "Boot environment '${bename}' was created from existing snapshot"
             echo -n "Destroy '${origin}' snapshot? (y/[n]): "
             read CHOICE
@@ -594,7 +594,7 @@ cmd_destroy() {
             | while read S;do
               echo "${snapshots}" | grep -E "/${S}$" \
                 | while read I;do
-                   if $remove_snapshots ;then
+                   if ${remove_snapshots} ;then
                      zfs destroy ${I}
                    fi
                 done
@@ -609,7 +609,7 @@ cmd_destroy() {
     esac
     shift
   done
-  if $destroyed; then
+  if ${destroyed}; then
     update_grub
   fi
   return 0
@@ -618,7 +618,7 @@ cmd_destroy() {
 cmd_mount() {
   local prmount=false
   while getopts "m" cm_pnam;do
-    case $cm_pnam in
+    case ${cm_pnam} in
       m) prmount=true
         ;;
       *) usage; return $? ;;
@@ -630,11 +630,11 @@ cmd_mount() {
   local be=$(get_bebase)/${bename}
   local mountroot=/beadm/${bename}
   if ! be_exists $be; then
-    echo "ERROR: Boot environment '$bename' does not exist" >&2
+    echo "ERROR: Boot environment '${bename}' does not exist" >&2
     return 1
   fi
   if be_is_mounted $be; then
-    echo "Boot environment '$bename' already mounted" >&2
+    echo "Boot environment '${bename}' already mounted" >&2
     $prmount && zfs mount| awk -v BE=${be} '$1==BE{print $2}'
     return 0
   fi
@@ -652,7 +652,7 @@ cmd_mount() {
 cmd_unmount() {
   local OPTS
   while getopts "f" cu_pnam;do
-    case $cu_pnam in
+    case ${cu_pnam} in
       f) OPTS="-f"
         ;;
       *) usage; return $? ;;
@@ -662,7 +662,7 @@ cmd_unmount() {
 
   local bename=${1}
   local be=$(get_bebase)/${bename}
-  if ! be_exists $be; then
+  if ! be_exists ${be}; then
     echo "ERROR: Boot environment '$bename' does not exist" >&2
     return 1
   fi
@@ -685,9 +685,9 @@ cmd_umount(){
 }
 
 cmd_activate() {
-  [ ${#} -eq 1 ] || (usage; return $?)
+  [[ ${#} -eq 1 ]] || (usage; return $?)
   local be=$(get_bebase)/$1
-  if ! be_exists $be; then
+  if ! be_exists ${be}; then
     echo "ERROR: Boot environment '$1' does not exist" >&2
     return 1
   fi
@@ -719,17 +719,17 @@ cmd_activate() {
 }
 
 cmd_rename() {
-  if [ ${#} -ne 2 ];then
+  if [[ ${#} -ne 2 ]];then
     usage
     return $?
   fi
   local old_bename=${1}
   local new_bename=${2}
-  if ! be_exists $(get_bebase)/$old_bename; then
+  if ! be_exists $(get_bebase)/${old_bename}; then
     echo "ERROR: Boot environment '$1' does not exist" >&2
     return 1
   fi
-  if ! zfs rename $(get_bebase)/$old_bename $(get_bebase)/$new_bename; then
+  if ! zfs rename $(get_bebase)/${old_bename} $(get_bebase)/${new_bename}; then
     return $?
   fi
   update_grub
@@ -737,6 +737,6 @@ cmd_rename() {
 }
 
 SUBCMD=$(get_command $1)
-if [ $# -ne 0 ]; then shift; fi
+if [[ $# -ne 0 ]]; then shift; fi
 CMDARGS="$@"
-$SUBCMD $CMDARGS
+${SUBCMD} ${CMDARGS}
