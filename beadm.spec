@@ -1,5 +1,5 @@
 Name:           zfs-beadm
-Version:        1.1.6
+Version:        1.1.7
 Release:        1%{?dist}
 Summary:        Beadm is used to setup and interact with Boot Environments with ZFS.
 Provides:       beadm = %{version}
