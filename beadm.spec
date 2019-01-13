@@ -77,6 +77,12 @@ install -pm 755 src/grub.d/* %{buildroot}%{_sysconfdir}/grub.d/
 
 
 %changelog
+* Sun Jan 13 2019 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.8-1
+- Fixed wrong 'or' operator
+
+* Sat Jan 12 2019 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.7-1
+- Update to upstream
+
 * Thu Aug 30 2018 Jerzy Drozdz <rpmbuilder@jdsieci.pl> - 1.1.6-1
 - Added missing dependencies in dracut module
 
