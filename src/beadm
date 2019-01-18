@@ -491,13 +491,13 @@ cmd_create() {
       *) usage; return $? ;;
     esac
   done
-  if [[ -n "$cc_source" ]];then
-    if ! be_exists $(get_bebase)/$cc_source; then
-      echo "ERROR: Boot environment '$cc_source' does not exist" >&2
-      return 1
-    fi
-    if be_exists $(get_bebase)/$cc_bename; then
-      echo "ERROR: Boot environment '$cc_bename' does exists" >&2
+  if be_exists $(get_bebase)/${cc_bename}; then
+    echo "ERROR: Boot environment '${cc_bename}' does exists" >&2
+    return 1
+  fi
+  if [[ -n "${cc_source}" ]];then
+    if ! be_exists $(get_bebase)/${cc_source}; then
+      echo "ERROR: Boot environment '${cc_source}' does not exist" >&2
       return 1
     fi
     be_new $(get_bebase)/${cc_source} $(get_bebase)/${cc_bename} || return 1
