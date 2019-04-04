@@ -624,8 +624,10 @@ cmd_mount() {
   shift $((OPTIND-1))
 
   local bename=${1}
+  shift
   local be=$(get_bebase)/${bename}
-  local mountroot=/beadm/${bename}
+  local mountroot=${1}
+  : ${mountroot:=/beadm/${bename}}
   if ! be_exists $be; then
     echo "ERROR: Boot environment '${bename}' does not exist" >&2
     return 1
