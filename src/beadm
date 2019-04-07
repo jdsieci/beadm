@@ -29,7 +29,7 @@ unset LANG
 unset LC_TIME
 
 if [[ "${1}" = "--version" || "${1}" = "-version" || "${1}" = "version" ]];then
-  echo "beadm 1.1.10 2019/04/05"
+  echo "beadm 1.1.11 2019/04/07"
   exit 0
 fi
 
@@ -538,6 +538,10 @@ cmd_destroy() {
     local bepath=$(get_bebase)/${bename}
     if ! be_exists ${bepath};then
       echo "ERROR: Boot environment '${bename}' does not exist" >&2
+      return 1
+    fi
+    if be_is_mounted ${bepath}; then
+      echo "ERROR: Boot environment '${bename}' is mounted" >&2
       return 1
     fi
     if ! ${forced} ;then
